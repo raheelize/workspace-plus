@@ -5,6 +5,9 @@ from django.contrib.auth import authenticate, login, logout
 from django.views import View
 from seats_app.forms import RegisterForm
 
+
+
+
 def register_view(request):
     if request.method == "POST":
         form = RegisterForm(request.POST)
@@ -28,7 +31,6 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            messages.success(request, f"Welcome back, {user.username} 👋")
             return redirect('/')  # redirect to your dashboard view
         else:
             messages.error(request, "Invalid username or password. Please try again.")

@@ -25,6 +25,8 @@ SECRET_KEY = 'django-insecure-(bzb^3*h$n51$c=-18c2e$074!2$b3628$l+wlp8#bz)s6#uam
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 AUTH_USER_MODEL = 'auth.User'  # default is fine
+TIME_ZONE = 'Asia/Karachi'
+USE_TZ = True
 ALLOWED_HOSTS = []
 
 
@@ -116,7 +118,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'seats_app/static/'
+# 👇 Directory where Django collects all static files (for production)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = '/seats_app/static/'
+STATICFILES_DIRS = [BASE_DIR / 'seats_app' / 'static']
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

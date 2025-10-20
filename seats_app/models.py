@@ -22,42 +22,43 @@ class Seat(models.Model):
         return self.code
 
 
+
 class Reservation(models.Model):
-    """
-    Stores when a user books a seat for a specific date.
-    Reservation lifespan is limited (e.g., same-day booking window).
-    """
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reservations')
-    seat = models.ForeignKey(Seat, on_delete=models.CASCADE, related_name='reservations')
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('expired', 'Expired'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    seat = models.ForeignKey(Seat, on_delete=models.CASCADE)
     date = models.DateField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)  # 👈 add this
+    expires_at = models.DateTimeField()
     is_active = models.BooleanField(default=True)
-
-    class Meta:
-        unique_together = (('seat', 'date'),)  # only one reservation per seat per date
-        indexes = [models.Index(fields=['date'])]
-
-    def __str__(self):
-        return f"{self.date} - {self.seat.code} - {self.user.username}"
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
 
     def expire(self):
-        """Mark reservation as expired and log the action."""
-        self.is_active = False
-        self.expires_at = timezone.now()
-        self.save(update_fields=['is_active', 'expires_at'])
-        ReservationLog.objects.create(
-            reservation=self,
-            user=self.user,
-            action="expired",
-            timestamp=self.expires_at
-        )
+        """Mark reservation as expired and log it."""
+        if self.is_active:
+            self.is_active = False
+            self.status = 'expired'
+            self.save(update_fields=['is_active', 'status'])
+            ReservationLog.objects.create(
+                reservation=self,
+                user=self.user,
+                action='expired',
+                timestamp=timezone.now()
+            )
+
+    def __str__(self):
+        return f"{self.user.username} - {self.seat.code} ({self.status})"
 
 
 class ReservationLog(models.Model):
     """
-    Tracks when a reservation was made or expired.
-    Helps with audit/history tracking.
+    Tracks when a reservation was made, cancelled, or expired.
+    Remains even if the reservation is deleted.
     """
     ACTION_CHOICES = [
         ('created', 'Created'),
@@ -65,10 +66,17 @@ class ReservationLog(models.Model):
         ('cancelled', 'Cancelled'),
     ]
 
-    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='logs')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    reservation = models.ForeignKey(
+        'Reservation',
+        on_delete=models.SET_NULL,   # 👈 keep the log even if reservation is deleted
+        null=True,
+        blank=True,
+        related_name='logs'
+    )
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    seat_code = models.CharField(max_length=50)  # 👈 snapshot of seat at time of log
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     timestamp = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        return f"{self.reservation.seat.code} - {self.action} by {self.user.username}"
+        return f"{self.seat_code} - {self.action} by {self.user or 'Unknown'}"

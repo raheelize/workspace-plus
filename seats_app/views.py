@@ -4,10 +4,10 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse,HttpResponseBadRequest
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from datetime import time, date
+from datetime import time, date,datetime
 import json
-
-from .models import Seat, Reservation
+import pytz
+from .models import Seat, Reservation,ReservationLog
 from django.contrib import messages
 
 # Time windows
@@ -16,12 +16,27 @@ RESERVATION_END = time(hour=18, minute=0)
 BOOKING_OPEN = time(hour=8, minute=30)
 BOOKING_CLOSE = time(hour=9, minute=15)
 
+# BOOKING_OPEN = time(hour=23, minute=30)
+# BOOKING_CLOSE = time(hour=23, minute=52)
 
 def in_booking_window(now=None):
-    now = now or timezone.localtime()
-    t = now.time()
-    return True
-    return BOOKING_OPEN <= t <= BOOKING_CLOSE
+    """Check if current local time (Asia/Karachi) is within booking window."""
+    pk_tz = pytz.timezone('Asia/Karachi')
+    now = now or timezone.now()
+    local_now = now.astimezone(pk_tz)
+    t = local_now.time()
+
+    print("BOOKING_OPEN :", BOOKING_OPEN, "BOOKING_CLOSE :", BOOKING_CLOSE)
+    print(BOOKING_OPEN <= t)
+    print(t <= BOOKING_CLOSE)
+    print(f"[DEBUG] Local time: {local_now}, Time component: {t}")
+
+    if BOOKING_OPEN <= BOOKING_CLOSE:
+        # normal case: same day
+        return BOOKING_OPEN <= t <= BOOKING_CLOSE
+    else:
+        # overnight case: e.g., 23:30 → 00:00
+        return t >= BOOKING_OPEN or t <= BOOKING_CLOSE
 
 
 def in_reservation_period(now=None):
@@ -36,45 +51,11 @@ def index(request):
     today = date.today()
 
     # Handle POST booking (when user clicks Book Selected Seat)
-    if request.method == "POST":
-        seat_id = request.POST.get("seat_id")
-        if not seat_id:
-            messages.error(request, "No seat selected.")
-            return redirect("index")
-
-        seat = Seat.objects.get(id=seat_id)
-
-        # Already has a reservation?
-        if Reservation.objects.filter(user=request.user, date=today).exists():
-            messages.warning(request, "You already have a reservation today.")
-            return redirect("index")
-
-        # Seat already booked?
-        if Reservation.objects.filter(seat=seat, date=today).exists():
-            messages.error(request, "This seat is already reserved.")
-            return redirect("index")
-
-        # Booking window check
-        if not in_booking_window():
-            messages.error(request, "Bookings are only open from 8:30 AM to 9:15 AM.")
-            return redirect("index")
-
-        # Create reservation
-        Reservation.objects.create(
-            user=request.user,
-            seat=seat,
-            date=today,
-            start_time=time(9, 0),
-            end_time=time(18, 0),
-        )
-        messages.success(request, f"Seat {seat.code} booked successfully!")
-        return redirect("index")
-
-    # Get all seats
+    
     seats = list(Seat.objects.filter(is_active=True))
 
     # Get today’s reservations
-    reservations = Reservation.objects.filter(date=today).select_related("seat", "user")
+    reservations = Reservation.objects.filter(date=today, status = 'active').select_related("seat", "user")
 
     # Map seat -> reservation
     reservation_map = {res.seat.id: res for res in reservations}
@@ -182,18 +163,21 @@ def seat_status_api(request):
     return JsonResponse({'seats': data})
 
 
+
+
 @login_required
 @require_POST
 def book_seat_api(request):
-    """Attempt to book a seat for the current user for today.
-    Server-side enforces booking window and single-reservation-per-user.
+    """
+    Attempt to book a seat for the current user for today.
+    Enforces booking window, one active reservation per user, and audit logs.
     """
     if not in_booking_window():
-        return JsonResponse({'ok': False, 'error': 'Booking window is closed'}, status=403)
-    
+        return JsonResponse({'ok': False, 'error': 'Booking window is closed.'}, status=403)
 
     if request.content_type != 'application/json':
         return HttpResponseBadRequest('Expected application/json')
+
     try:
         payload = json.loads(request.body.decode('utf-8'))
     except json.JSONDecodeError:
@@ -201,35 +185,68 @@ def book_seat_api(request):
 
     seat_id = payload.get('seat_id')
     if not seat_id:
-        return JsonResponse({'ok': False, 'error': 'No seat specified'}, status=400)
+        return JsonResponse({'ok': False, 'error': 'No seat specified.'}, status=400)
 
     today = date.today()
+    expires_at = timezone.make_aware(datetime.combine(today, time(18, 0)))  # auto-expire at 6 PM
 
-    # If user already has a reservation today, forbid another one
-    if Reservation.objects.filter(user=request.user, date=today).exists():
-        return JsonResponse({'ok': False, 'error': 'You already have a reservation for today'}, status=403)
+    # 🛑 Prevent multiple active reservations per user per day
+    if Reservation.objects.filter(user=request.user, date=today, status='active').exists():
+        return JsonResponse({'ok': False, 'error': 'You already have an active reservation today.'}, status=403)
 
     seat = get_object_or_404(Seat, pk=seat_id, is_active=True)
 
-    # Make sure seat isn't already reserved for today (race-safe with get_or_create)
-    reservation, created = Reservation.objects.get_or_create(user=request.user, seat=seat, date=today)
-    if not created:
-        return JsonResponse({'ok': False, 'error': 'Seat already reserved'}, status=403)
+    # 🛑 Ensure seat isn’t already reserved for today (active only)
+    if Reservation.objects.filter(seat=seat, date=today, status='active').exists():
+        return JsonResponse({'ok': False, 'error': 'Seat already reserved by another user.'}, status=403)
 
-    return JsonResponse({'ok': True, 'message': 'Seat booked', 'reservation_id': reservation.id})
+    # ✅ Create new reservation
+    reservation = Reservation.objects.create(
+        user=request.user,
+        seat=seat,
+        date=today,
+        expires_at=expires_at,
+        status='active',
+        is_active=True
+    )
+
+    # 🪵 Log reservation creation
+    ReservationLog.objects.create(
+        reservation=reservation,
+        user=request.user,
+        action='created',
+        timestamp=timezone.now()
+    )
+
+    return JsonResponse({
+        'ok': True,
+        'message': f'Seat {seat.code} booked successfully until 6:00 PM.',
+        'reservation_id': reservation.id
+    })
 
 
-@login_required
-@require_POST
 def cancel_reservation_api(request):
-    # Allow cancel only inside booking window or before reservation start? Business choice.
-    # We'll allow cancellation until reservation end (6:00 PM).
-    if not in_reservation_period() and not in_booking_window():
+    """Cancel the current user's reservation (soft delete)."""
+    if not in_booking_window():
         return JsonResponse({'ok': False, 'error': 'Cannot cancel outside reservation hours'}, status=403)
 
     today = date.today()
-    res = Reservation.objects.filter(user=request.user, date=today).first()
-    if not res:
-        return JsonResponse({'ok': False, 'error': 'No reservation to cancel'}, status=404)
-    res.delete()
-    return JsonResponse({'ok': True, 'message': 'Reservation canceled'})
+    reservation = Reservation.objects.filter(user=request.user, date=today, is_active=True).first()
+
+    if not reservation:
+        return JsonResponse({'ok': False, 'error': 'No active reservation to cancel'}, status=404)
+
+    # 🪵 Log the cancellation
+    ReservationLog.objects.create(
+        reservation=reservation,
+        user=request.user,
+        action='cancelled',
+        timestamp=timezone.now()
+    )
+
+    # 🔄 Mark reservation as cancelled instead of deleting
+    reservation.is_active = False
+    reservation.status = 'cancelled'   # assuming you have a status field like ('active', 'expired', 'cancelled')
+    reservation.save(update_fields=['is_active', 'status'])
+
+    return JsonResponse({'ok': True, 'message': 'Reservation cancelled successfully.'})
