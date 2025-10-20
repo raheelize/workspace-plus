@@ -1,112 +1,121 @@
 {% extends 'base.html' %}
-{% block title %}Seat Map{% endblock %}
+{% block title %}Book your seat | Workspace+{% endblock %}
 
 {% block content %}
-<div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-white/20">
-<!-- 🎯 Compact Seat Reservation Header -->
-<div class="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-xl shadow-sm p-5 text-center border border-gray-200">
-  
-  <!-- 🏷️ Header -->
-  <h1 class="text-xl md:text-2xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-600">
-    Seat Map — Today
-  </h1>
+<div class="bg-gray-700 backdrop-blur-md rounded-2xl shadow-xl p-6 border border-gray-800">
 
-  <!-- 🕓 Info -->
-  <p class="text-xs md:text-sm text-gray-700 mb-4">
-    Booking window: <span class="font-semibold text-indigo-600">8:30 AM – 9:15 AM</span>.  
-    Reservations valid until <span class="font-semibold text-indigo-600">6:00 PM</span>.
-  </p>
+  <!-- 🎯 Seat Reservation Header - Full-width Responsive -->
+<div class="bg-gray-800/90 backdrop-blur-sm rounded-xl shadow-md p-4 md:p-5 border border-gray-700 w-full max-w-6xl mx-auto flex flex-col md:flex-row gap-4">
 
-  <!-- 🧾 Reservation Info -->
-  <div class="mt-4 bg-white rounded-lg shadow p-4 inline-block min-w-[240px]">
+  <!-- Left Column: Instructions / Info -->
+  <div class="flex-1 flex flex-col justify-center gap-2">
+    <h1 class="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+      Seat Map — Today
+    </h1>
+    <p class="text-xs md:text-sm text-gray-300">
+      Booking window: <span class="font-semibold text-blue-400">8:30 AM – 9:15 AM</span>.<br>
+      Reservations valid until: <span class="font-semibold text-blue-400">6:00 PM</span>.
+    </p>
+    <p class="text-xs md:text-sm text-gray-400 mt-1">
+      Please select your seat carefully. Only one seat can be booked per user per day.
+    </p>
+  </div>
+
+  <!-- Right Column: Reservation / Fallback -->
+  <div class="flex-1 flex items-center justify-end">
     {% if user_reservation %}
-      <p class="text-gray-800 text-sm">
-        🎟️ You’ve reserved seat 
-        <span class="text-blue-600 font-semibold">{{ user_reservation.seat.code }}</span> 
-        for today.
-      </p>
+    <div class="flex items-center gap-3 md:gap-4 bg-gray-700/70 rounded-lg p-3 shadow-sm text-gray-200 text-sm w-full md:w-auto">
+      
+      <!-- Seat Icon -->
+      <div class="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-blue-400 text-white rounded-full shadow">
+        <svg class="w-5 h-5 mb-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 10h12v2H4v-2zm0-4h12v2H4V6zm2 8h2v4H6v-4zm6 0h2v4h-2v-4z"/>
+        </svg>
+      </div>
+      <h4>Your Reserved Seat</h4>
+      <!-- Seat Code -->
+      <span class="font-bold text-gray-900 bg-white rounded p-1 font-mono">{{ user_reservation.seat.code }}</span>
 
       <!-- Cancel Button -->
       <button id="cancel-reservation-btn"
-              class="mt-3 inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-1.5 rounded-md shadow-sm transition-all duration-200">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-2 md:px-3 py-1 rounded-md shadow-sm text-xs md:text-sm transition-all duration-200">
+        <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
         </svg>
-        Cancel
+
+        <span class="hidden md:inline">Cancel</span>
       </button>
+
+    </div>
     {% else %}
-      <p class="text-gray-700 text-sm">
-        💺 You haven’t booked a seat yet.
-      </p>
+    <!-- Fallback / No Reservation -->
+    <p class="text-gray-400 text-sm md:text-right w-full md:w-auto">
+      <svg class="w-5 h-5 mb-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M4 10h12v2H4v-2zm0-4h12v2H4V6zm2 8h2v4H6v-4zm6 0h2v4h-2v-4z"/>
+        </svg>You haven't booked a seat yet.
+    </p>
     {% endif %}
-
-    <p id="selected-seat-display" class="text-blue-600 font-medium mt-2 text-sm"></p>
   </div>
-</div>
 
+</div>
 
   <!-- 🪑 Seat Map -->
-{% if seats %}
-<div id="seat-map-container" 
-     class="flex justify-center items-center w-full overflow-x-auto bg-gray-50 rounded-xl shadow-inner p-4">
-  <div id="seat-map-wrapper" class="relative inline-block min-w-max">
-    <div 
-      id="seat-map"
-      class="relative rounded-xl mx-auto"
-      style="transform-origin: top center;"
-    >
-      {% for seat in seats %}
-        <div
-          class="absolute flex items-center justify-center rounded-xl font-bold transition-all duration-300 ease-out seat-item shadow-md
-            {% if not seat.is_active %}
-              bg-gray-300 cursor-not-allowed opacity-50
-            {% elif not seat.is_reservable %}
-              bg-gray-200 text-gray-500 cursor-not-allowed opacity-60
-            {% elif seat.is_reserved and seat.user == request.user %}
-              bg-gradient-to-br from-blue-500 to-indigo-600 text-white ring-4 ring-blue-300 shadow-lg
-            {% elif seat.is_reserved %}
-              bg-gradient-to-br from-red-400 to-red-600 text-white cursor-not-allowed
-            {% else %}
-              bg-gradient-to-br from-green-400 to-emerald-500 text-white cursor-pointer hover:scale-125 hover:shadow-2xl hover:from-green-500 hover:to-emerald-600
-            {% endif %}"
-          data-seat-id="{{ seat.id }}"
-          data-x="{{ seat.x }}"
-          data-y="{{ seat.y }}"
-          title="Seat {{ seat.code }}"
-          style="width: 44px; height: 44px;"
-        >
-          <div class="flex flex-col items-center justify-center">
-            <svg class="w-5 h-5 mb-0.5" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
-            </svg>
-            <span class="seat-label text-xs font-semibold">{{ seat.code }}</span>
+  {% if seats %}
+  <div id="seat-map-container" 
+       class="flex justify-center items-center w-full overflow-x-auto bg-gray-800/60 rounded-xl shadow-inner p-4 mt-6">
+    <div id="seat-map-wrapper" class="relative inline-block min-w-max">
+      <div id="seat-map" class="relative rounded-xl mx-auto" style="transform-origin: top center;">
+        {% for seat in seats %}
+          <div
+            class="absolute flex items-center justify-center rounded-xl font-bold transition-all duration-300 ease-out seat-item shadow-md
+              {% if not seat.is_active %}
+                bg-red-200 cursor-not-allowed opacity-50
+              {% elif not seat.is_reservable %}
+                bg-gray-200 text-gray-500 cursor-not-allowed opacity-60
+              {% elif seat.is_reserved and seat.user == request.user %}
+                bg-gradient-to-br from-blue-500 to-purple-600 text-white ring-4 ring-blue-400 shadow-lg
+              {% elif seat.is_reserved %}
+                bg-gradient-to-br from-red-500 to-red-700 text-white cursor-not-allowed
+              {% else %}
+                bg-gradient-to-br from-green-400 to-emerald-500 text-white cursor-pointer hover:scale-125 hover:shadow-2xl hover:from-green-500 hover:to-emerald-600
+              {% endif %}"
+            data-seat-id="{{ seat.id }}"
+            data-x="{{ seat.x }}"
+            data-y="{{ seat.y }}"
+            title="Seat {{ seat.code }}"
+            style="width: 44px; height: 44px;"
+          >
+            <div class="flex flex-col items-center justify-center">
+                <svg class="w-5 h-5 mb-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M4 10h12v2H4v-2zm0-4h12v2H4V6zm2 8h2v4H6v-4zm6 0h2v4h-2v-4z"/>
+                </svg>
+
+              <span class="seat-label text-xs font-semibold">{{ seat.code }}</span>
+            </div>
           </div>
-        </div>
-      {% endfor %}
+        {% endfor %}
+      </div>
     </div>
   </div>
-</div>
-{% else %}
-<p class="text-center text-gray-500 mt-8">No seat data available.</p>
-{% endif %}
+  {% else %}
+  <p class="text-center text-gray-400 mt-8">No seat data available.</p>
+  {% endif %}
 
   <!-- 🧩 Legend -->
-  <div class="flex justify-center mt-8 space-x-6">
+  <div class="flex justify-center mt-6 space-x-6 text-gray-300">
     <div class="flex items-center space-x-2">
       <div class="w-4 h-4 bg-gradient-to-br from-green-400 to-emerald-500 rounded"></div>
-      <span class="text-sm text-gray-700">Available</span>
+      <span class="text-sm">Available</span>
     </div>
     <div class="flex items-center space-x-2">
-      <div class="w-4 h-4 bg-gradient-to-br from-red-400 to-red-600 rounded"></div>
-      <span class="text-sm text-gray-700">Reserved</span>
+      <div class="w-4 h-4 bg-gradient-to-br from-red-500 to-red-700 rounded"></div>
+      <span class="text-sm">Reserved</span>
     </div>
     <div class="flex items-center space-x-2">
-      <div class="w-4 h-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded"></div>
-      <span class="text-sm text-gray-700">Your Seat</span>
+      <div class="w-4 h-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded"></div>
+      <span class="text-sm">Your Seat</span>
     </div>
   </div>
-
-
 
   <!-- 🚀 Booking Form -->
   <div class="mt-6 flex justify-center">
@@ -116,7 +125,7 @@
       <button 
         type="submit"
         id="book-btn"
-        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-300"
+        class="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300"
         disabled
       >
         <span id="btn-text">Book Selected Seat</span>
@@ -124,7 +133,6 @@
     </form>
   </div>
 </div>
-
 <!-- 🧠 Seat Map JS -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -194,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const seatCode = seat.querySelector('.seat-label').textContent;
     bookBtn.disabled = false;
     seatInput.value = seat.dataset.seatId;
-    selectedSeatDisplay.textContent = `Seat ${seatCode} selected`;
+    // selectedSeatDisplay.textContent = `Seat ${seatCode} selected`;
     btnText.textContent = `Confirm Seat ${seatCode}`;
   });
 });
@@ -202,13 +210,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 function resetUI() {
-  document.getElementById("selected-seat-id").value = "";
-  document.getElementById("selected-seat-display").textContent = "";
-  document.getElementById("book-btn").disabled = true;
-  document.querySelectorAll(".seat-item").forEach(el => {
-    el.classList.remove("seat-selected", "ring-4", "ring-blue-400", "scale-110", "from-blue-500", "to-indigo-600", "from-red-400", "to-red-600");
-    el.classList.add("from-green-400", "to-emerald-500");
-  });
+    const seatDisplay = document.getElementById("selected-seat-display");
+    if (seatDisplay) seatDisplay.textContent = "";
+
+    const seatInput = document.getElementById("selected-seat-id");
+    if (seatInput) seatInput.value = "";
+
+    const bookBtn = document.getElementById("book-btn");
+    if (bookBtn) bookBtn.disabled = true;
+
+    document.querySelectorAll(".seat-item").forEach(el => {
+        el.classList.remove(
+            "seat-selected", "ring-4", "ring-blue-400", 
+            "scale-110", "from-blue-500", "to-indigo-600", 
+            "from-red-400", "to-red-600"
+        );
+        el.classList.add("from-green-400", "to-emerald-500");
+    });
 }
 
 // 🪄 Toast notifications (centered top)
@@ -245,7 +263,7 @@ document.getElementById("booking-form")?.addEventListener("submit", async (e) =>
 
     const data = await res.json();
     if (res.ok) {
-      showToast(`✅ Seat ${data.seat_code} booked successfully!`, "success");
+      showToast(`✅ Seat booked successfully!`, "success");
       resetUI();
       setTimeout(() => location.reload(), 1000);
     } else showToast(data.error || "Booking failed.", "error");

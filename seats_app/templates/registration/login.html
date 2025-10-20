@@ -1,32 +1,41 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login — Workspace+</title>
+  <title>Login — NTL-ES | Workspace+</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Optional: smoother text gradient for Web3 neon effect */
+    .text-gradient {
+      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
 </head>
-<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 p-4">
+<body class="min-h-screen flex items-center justify-center bg-gray-900 p-4">
 
-  <div class="w-full max-w-md bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-8">
-    <div class="text-center mb-8">
-      <h1 class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
-        ES Workspace+
-      </h1>
-      <p class="text-sm text-gray-500 mt-2">One tap, one seat, zero hassle.</p>
+  <div class="w-full max-w-md bg-gray-900/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-800 p-8">
+    <!-- Header -->
+    <div class="text-center mb-8 flex flex-col items-center gap-4">
+        <!-- Logo -->
+        <img src="{% static 'images/workspace-plus-logo.png' %}" alt="Workspace+ Logo" class="w-80 object-contain">
+        <!-- Subtitle -->
+        <p class="text-sm text-gray-400">
+            Sign In with your Nayatel Username
+        </p>
     </div>
-
     {% if form.errors %}
-      <div class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-5 text-sm text-center">
+      <div class="bg-red-800/40 border border-red-600 text-red-400 px-4 py-3 rounded-lg mb-5 text-sm text-center">
         Invalid username or password. Please try again.
       </div>
     {% endif %}
 
-
-    <!-- 🔹 Django messages -->
     {% if messages %}
       {% for message in messages %}
-        <div class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-5 text-sm text-center">
+        <div class="bg-red-800/40 border border-red-600 text-red-400 px-4 py-3 rounded-lg mb-5 text-sm text-center">
           {{ message }}
         </div>
       {% endfor %}
@@ -36,46 +45,46 @@
       {% csrf_token %}
       
       <div>
-        <label for="id_username" class="block text-sm font-semibold text-gray-700 mb-2">Username</label>
+        <label for="id_username" class="block text-sm font-semibold text-gray-300 mb-2">Username</label>
         <input
           type="text"
           name="username"
           id="id_username"
           placeholder="Enter your username"
-          class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-gray-800 placeholder-gray-400 transition-all duration-200"
+          class="w-full px-4 py-2.5 rounded-lg border border-gray-700 bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200"
           required
         />
       </div>
 
       <div>
-        <label for="id_password" class="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+        <label for="id_password" class="block text-sm font-semibold text-gray-300 mb-2">Password</label>
         <input
           type="password"
           name="password"
           id="id_password"
           placeholder="••••••••"
-          class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-gray-800 placeholder-gray-400 transition-all duration-200"
+          class="w-full px-4 py-2.5 rounded-lg border border-gray-700 bg-gray-800 text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200"
           required
         />
       </div>
 
       <button
         type="submit"
-        class="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold py-2.5 rounded-lg shadow-sm hover:shadow-md hover:from-indigo-700 hover:to-blue-700 transition-all duration-200"
+        class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-2.5 rounded-lg shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
       >
         Sign In
       </button>
     </form>
 
-    <div class="text-center mt-6 text-sm text-gray-600">
+    <div class="text-center mt-6 text-sm text-gray-400">
       Don’t have an account?
-      <a href="{% url 'register' %}" class="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline">
+      <a href="{% url 'register' %}" class="text-blue-500 hover:text-purple-500 font-semibold hover:underline">
         Register
       </a>
     </div>
 
-    <p class="text-center text-xs text-gray-400 mt-6">
-      © {{ year|default:"2025" }} Seat Reservation System
+    <p class="text-center text-xs text-gray-500 mt-6">
+      © {{ year|default:"2025" }} NTL-ES | Workspace+
     </p>
   </div>
 
