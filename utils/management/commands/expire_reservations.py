@@ -33,6 +33,7 @@ class Command(BaseCommand):
             ReservationLog.objects.create(
                 reservation=reservation,
                 action="expired",
+                is_active = False,
                 timestamp=timezone.now()
             )
 
