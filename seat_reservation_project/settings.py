@@ -27,7 +27,15 @@ DEBUG = True
 AUTH_USER_MODEL = 'auth.User'  # default is fine
 TIME_ZONE = 'Asia/Karachi'
 USE_TZ = True
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '127.0.0.1',        # localhost
+    'localhost',
+    '108.181.198.88',   # your server IP
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://108.181.198.88:4545",   # include protocol
+]
 
 
 # Application definition
