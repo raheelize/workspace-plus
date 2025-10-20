@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create Account — NTL-ES Book Seat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 p-4">
+
+  <div class="w-full max-w-md bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-8">
+    
+    <!-- 🔹 Header -->
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
+        NTL-ES Book Seat
+      </h1>
+      <p class="text-sm text-gray-500 mt-2">Create your account using your Nayatel email</p>
+    </div>
+
+    <!-- 🔹 Django messages -->
+    {% if messages %}
+      {% for message in messages %}
+        <div class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg mb-5 text-sm text-center">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <!-- 🔹 Form -->
+    <form method="POST" class="space-y-5">
+      {% csrf_token %}
+
+      <!-- Email -->
+      <div>
+        <label for="id_email" class="block text-sm font-semibold text-gray-700 mb-2">Work Email</label>
+        {{ form.email }}
+        {% if form.email.errors %}
+          <p class="text-sm text-red-600 mt-1">{{ form.email.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Password -->
+      <div>
+        <label for="id_password1" class="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+        {{ form.password1 }}
+        {% if form.password1.errors %}
+          <p class="text-sm text-red-600 mt-1">{{ form.password1.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Confirm Password -->
+      <div>
+        <label for="id_password2" class="block text-sm font-semibold text-gray-700 mb-2">Confirm Password</label>
+        {{ form.password2 }}
+        {% if form.password2.errors %}
+          <p class="text-sm text-red-600 mt-1">{{ form.password2.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Submit -->
+      <button
+        type="submit"
+        class="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold py-2.5 rounded-lg shadow-sm hover:shadow-md hover:from-indigo-700 hover:to-blue-700 transition-all duration-200"
+      >
+        Create Account
+      </button>
+    </form>
+
+    <!-- 🔹 Footer -->
+    <div class="text-center mt-6 text-sm text-gray-600">
+      Already have an account?
+      <a href="{% url 'login' %}" class="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline">
+        Sign in
+      </a>
+    </div>
+
+    <p class="text-center text-xs text-gray-400 mt-6">
+      © {{ year|default:"2025" }} NTL-ES Book Seat
+    </p>
+  </div>
+
+</body>
+</html>

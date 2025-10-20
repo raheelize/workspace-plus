@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+{% block title %}Seat Map{% endblock %}
+
+{% block content %}
+<div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-white/20">
+<!-- 🎯 Compact Seat Reservation Header -->
+<div class="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-xl shadow-sm p-5 text-center border border-gray-200">
+  
+  <!-- 🏷️ Header -->
+  <h1 class="text-xl md:text-2xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-600">
+    Seat Map — Today
+  </h1>
+
+  <!-- 🕓 Info -->
+  <p class="text-xs md:text-sm text-gray-700 mb-4">
+    Booking window: <span class="font-semibold text-indigo-600">8:30 AM – 9:15 AM</span>.  
+    Reservations valid until <span class="font-semibold text-indigo-600">6:00 PM</span>.
+  </p>
+
+  <!-- 🧾 Reservation Info -->
+  <div class="mt-4 bg-white rounded-lg shadow p-4 inline-block min-w-[240px]">
+    {% if user_reservation %}
+      <p class="text-gray-800 text-sm">
+        🎟️ You’ve reserved seat 
+        <span class="text-blue-600 font-semibold">{{ user_reservation.seat.code }}</span> 
+        for today.
+      </p>
+
+      <!-- Cancel Button -->
+      <button id="cancel-reservation-btn"
+              class="mt-3 inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-1.5 rounded-md shadow-sm transition-all duration-200">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        Cancel
+      </button>
+    {% else %}
+      <p class="text-gray-700 text-sm">
+        💺 You haven’t booked a seat yet.
+      </p>
+    {% endif %}
+
+    <p id="selected-seat-display" class="text-blue-600 font-medium mt-2 text-sm"></p>
+  </div>
+</div>
+
+
+  <!-- 🪑 Seat Map -->
+{% if seats %}
+<div id="seat-map-container" 
+     class="flex justify-center items-center w-full overflow-x-auto bg-gray-50 rounded-xl shadow-inner p-4">
+  <div id="seat-map-wrapper" class="relative inline-block min-w-max">
+    <div 
+      id="seat-map"
+      class="relative rounded-xl mx-auto"
+      style="transform-origin: top center;"
+    >
+      {% for seat in seats %}
+        <div
+          class="absolute flex items-center justify-center rounded-xl font-bold transition-all duration-300 ease-out seat-item shadow-md
+            {% if not seat.is_active %}
+              bg-gray-300 cursor-not-allowed opacity-50
+            {% elif not seat.is_reservable %}
+              bg-gray-200 text-gray-500 cursor-not-allowed opacity-60
+            {% elif seat.is_reserved and seat.user == request.user %}
+              bg-gradient-to-br from-blue-500 to-indigo-600 text-white ring-4 ring-blue-300 shadow-lg
+            {% elif seat.is_reserved %}
+              bg-gradient-to-br from-red-400 to-red-600 text-white cursor-not-allowed
+            {% else %}
+              bg-gradient-to-br from-green-400 to-emerald-500 text-white cursor-pointer hover:scale-125 hover:shadow-2xl hover:from-green-500 hover:to-emerald-600
+            {% endif %}"
+          data-seat-id="{{ seat.id }}"
+          data-x="{{ seat.x }}"
+          data-y="{{ seat.y }}"
+          title="Seat {{ seat.code }}"
+          style="width: 44px; height: 44px;"
+        >
+          <div class="flex flex-col items-center justify-center">
+            <svg class="w-5 h-5 mb-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
+            </svg>
+            <span class="seat-label text-xs font-semibold">{{ seat.code }}</span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% else %}
+<p class="text-center text-gray-500 mt-8">No seat data available.</p>
+{% endif %}
+
+  <!-- 🧩 Legend -->
+  <div class="flex justify-center mt-8 space-x-6">
+    <div class="flex items-center space-x-2">
+      <div class="w-4 h-4 bg-gradient-to-br from-green-400 to-emerald-500 rounded"></div>
+      <span class="text-sm text-gray-700">Available</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <div class="w-4 h-4 bg-gradient-to-br from-red-400 to-red-600 rounded"></div>
+      <span class="text-sm text-gray-700">Reserved</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <div class="w-4 h-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded"></div>
+      <span class="text-sm text-gray-700">Your Seat</span>
+    </div>
+  </div>
+
+
+
+  <!-- 🚀 Booking Form -->
+  <div class="mt-6 flex justify-center">
+    <form method="POST" id="booking-form">
+      {% csrf_token %}
+      <input type="hidden" name="seat_id" id="selected-seat-id">
+      <button 
+        type="submit"
+        id="book-btn"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-300"
+        disabled
+      >
+        <span id="btn-text">Book Selected Seat</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- 🧠 Seat Map JS -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const seatMap = document.getElementById('seat-map');
+  const bookBtn = document.getElementById('book-btn');
+  const seatInput = document.getElementById('selected-seat-id');
+  const selectedSeatDisplay = document.getElementById('selected-seat-display');
+  const btnText = document.getElementById('btn-text');
+  let selectedSeat = null;
+
+  const seats = Array.from(document.querySelectorAll('[data-seat-id]'));
+  if (seats.length === 0) return;
+
+  // Find seat coordinate bounds
+  const coords = seats.map(seat => ({
+    x: parseFloat(seat.dataset.x),
+    y: parseFloat(seat.dataset.y)
+  }));
+
+  const minX = Math.min(...coords.map(c => c.x));
+  const maxX = Math.max(...coords.map(c => c.x)) + 44;
+  const minY = Math.min(...coords.map(c => c.y));
+  const maxY = Math.max(...coords.map(c => c.y)) + 44;
+
+  const seatWidth = maxX - minX;
+  const seatHeight = maxY - minY;
+
+  seatMap.style.width = `${seatWidth}px`;
+  seatMap.style.height = `${seatHeight}px`;
+
+  // Reposition seats relative to minX/minY
+  seats.forEach(seat => {
+    const x = parseFloat(seat.dataset.x) - minX;
+    const y = parseFloat(seat.dataset.y) - minY;
+    seat.style.left = `${x}px`;
+    seat.style.top = `${y}px`;
+  });
+
+  // 🔄 Responsive scaling
+  const resizeSeatMap = () => {
+    const containerWidth = document.getElementById('seat-map-container').clientWidth;
+    const scale = Math.min(containerWidth / seatWidth, 1);
+    seatMap.style.transform = `scale(${scale})`;
+  };
+
+  resizeSeatMap();
+  window.addEventListener('resize', () => {
+    clearTimeout(window._resizeTimer);
+    window._resizeTimer = setTimeout(resizeSeatMap, 200);
+  });
+
+  // 🎯 Seat selection
+  seatMap.addEventListener('click', e => {
+    const seat = e.target.closest('[data-seat-id]');
+    if (!seat || seat.classList.contains('cursor-not-allowed')) return;
+
+    if (selectedSeat) {
+      selectedSeat.classList.remove('ring-4', 'ring-blue-400', 'seat-selected', 'scale-110');
+      selectedSeat.classList.remove('from-blue-500', 'to-indigo-600');
+      selectedSeat.classList.add('from-green-400', 'to-emerald-500');
+    }
+
+    selectedSeat = seat;
+    seat.classList.remove('from-green-400', 'to-emerald-500');
+    seat.classList.add('from-blue-500', 'to-indigo-600', 'ring-4', 'ring-blue-400', 'seat-selected', 'scale-110');
+    
+    const seatCode = seat.querySelector('.seat-label').textContent;
+    bookBtn.disabled = false;
+    seatInput.value = seat.dataset.seatId;
+    selectedSeatDisplay.textContent = `Seat ${seatCode} selected`;
+    btnText.textContent = `Confirm Seat ${seatCode}`;
+  });
+});
+
+
+
+function resetUI() {
+  document.getElementById("selected-seat-id").value = "";
+  document.getElementById("selected-seat-display").textContent = "";
+  document.getElementById("book-btn").disabled = true;
+  document.querySelectorAll(".seat-item").forEach(el => {
+    el.classList.remove("seat-selected", "ring-4", "ring-blue-400", "scale-110", "from-blue-500", "to-indigo-600", "from-red-400", "to-red-600");
+    el.classList.add("from-green-400", "to-emerald-500");
+  });
+}
+
+// 🪄 Toast notifications (centered top)
+function showToast(msg, type = "info") {
+  const colors = {
+    success: "bg-green-600",
+    error: "bg-red-600",
+    warning: "bg-yellow-500",
+    info: "bg-blue-600"
+  };
+  const toast = document.createElement("div");
+  toast.className = `${colors[type]} text-white px-4 py-2 rounded-lg shadow-lg fixed top-6 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down`;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+}
+
+// 🎟️ Book Seat
+document.getElementById("booking-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const seatId = document.getElementById("selected-seat-id").value;
+  const bookBtn = document.getElementById("book-btn");
+
+  if (!seatId) return showToast("⚠️ Please select a seat first!", "warning");
+  bookBtn.disabled = true;
+
+  try {
+    const res = await fetch("{% url 'seats:book_seat_api' %}", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+      body: JSON.stringify({ seat_id: seatId })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`✅ Seat ${data.seat_code} booked successfully!`, "success");
+      resetUI();
+      setTimeout(() => location.reload(), 1000);
+    } else showToast(data.error || "Booking failed.", "error");
+  } catch {
+    showToast("Network error — try again.", "error");
+  } finally {
+    bookBtn.disabled = false;
+  }
+});
+
+// ❌ Cancel Reservation
+document.getElementById("cancel-reservation-btn")?.addEventListener("click", async () => {
+  try {
+    const res = await fetch("{% url 'seats:cancel_reservation_api' %}", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      showToast("Reservation cancelled.", "success");
+      resetUI();
+      setTimeout(() => location.reload(), 1000);
+    } else showToast(data.error || "Cancel failed.", "error");
+  } catch {
+    showToast("Error cancelling reservation.", "error");
+  }
+});
+
+// ✨ Small animation
+const style = document.createElement("style");
+style.textContent = `
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-down {
+  animation: slide-down 0.3s ease-out;
+}
+`;
+document.head.appendChild(style);
+
+
+</script>
+{% endblock %}
