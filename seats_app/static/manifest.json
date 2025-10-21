@@ -1,0 +1,21 @@
+{
+  "name": "Workspace+ Seat Reservation",
+  "short_name": "Workspace+",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#1e293b",
+  "description": "Book your workspace seat quickly and securely.",
+  "icons": [
+    {
+      "src": "/static/images/wsp.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/images/wsp.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -2,10 +2,28 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login — NTL-ES | Workspace+</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Workspace+</title> <!-- Change to Register for register page -->
+  <meta name="description" content="Login to reserve your workspace seat securely.">
+  <meta name="keywords" content="workspace, Nayatel, seat reservation, office, login">
+  <meta name="author" content="PRYSM Technologies">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="Workspace+ Login">
+  <meta property="og:description" content="Login to reserve your workspace seat securely.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://workspaceplus.com/">
+  <meta property="og:image" content="{% static 'images/wsp.png' %}">
+  
+  <!-- PWA -->
+  <link rel="manifest" href="{% static 'manifest.json' %}">
+  <link rel="icon" href="{% static 'images/favicon.png' %}">
+  <meta name="theme-color" content="#1F2937">
+  <link rel="icon" type="image/x-icon" href="{% static 'images/wsp.ico' %}">
   <script src="https://cdn.tailwindcss.com"></script>
+
+
   <style>
     /* Optional: smoother text gradient for Web3 neon effect */
     .text-gradient {
