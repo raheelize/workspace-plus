@@ -22,7 +22,7 @@ def register_view(request):
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect('/')  # already logged in → redirect to dashboard/home
+        return redirect('/workspace')  # already logged in → redirect to dashboard/home
     
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -31,7 +31,7 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect('/')  # redirect to your dashboard view
+            return redirect('/workspace')  # redirect to your dashboard view
         else:
             messages.error(request, "Invalid username or password. Please try again.")
 

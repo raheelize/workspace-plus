@@ -1,137 +1,376 @@
+{% extends 'base.html' %}
 {% load static %}
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Admin Seat Map</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    /* ensure seat elements are draggable but not selecting text */
-    .seat-admin { touch-action: none; user-select: none; }
-  </style>
-</head>
-<body class="bg-gray-100 min-h-screen p-6">
-  <div class="max-w-7xl mx-auto">
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-xl font-bold">Admin Seat Map — Drag seats to position</h1>
-      <div>
-        <button id="save-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Save Positions</button>
-        <a href="{% url 'seats:index' %}" class="ml-3 text-sm text-blue-600">View public map</a>
-      </div>
-    </div>
 
-    <p class="text-sm text-gray-600 mb-4">Drag a seat, drop it at desired location, then press Save. Coordinates are in pixels relative to the map container top-left.</p>
+{% block content %}
+<div class="mx-auto p-4 md:p-8 min-h-screen bg-gray-50 text-gray-800">
 
-    <!-- map container -->
-    <div id="map" class="relative bg-white border rounded-lg shadow h-[700px]">
-      {% for seat in seats %}
-        <div
-          class="seat-admin absolute w-12 h-12 rounded-lg flex items-center justify-center text-white font-semibold cursor-grab shadow-md"
-          data-id="{{ seat.id }}"
-          style="left: {{ seat.x|default:50 }}px; top: {{ seat.y|default:50 }}px; background: {% if seat.is_reserved and seat.user == request.user %} #2563eb {% elif seat.is_reserved %} #ef4444 {% else %} #10b981 {% endif %};"
-          title="Code: {{ seat.code }} (id: {{ seat.id }})"
-        >
-          {{ seat.code }}
+    <div class="flex items-center justify-between mb-8 py-2 px-4 bg-white rounded-xl shadow-lg border border-gray-100">
+        <div>
+            <h1 class="text-3xl font-medium text-gray-900 flex items-center">
+                <svg class="w-8 h-8 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                System Control Panel
+            </h1>
+            <p class="text-sm text-gray-500 mt-1 ml-11">Management for map layouts.</p>
         </div>
-      {% endfor %}
+        
+        <!-- Action Buttons -->
+        <div class="flex space-x-3">
+            <!-- Save Button (Disabled by default) -->
+            <button id="save-button" class="px-5 py-2 text-white font-semibold rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                Save Changes (0)
+            </button>
+            
+            <!-- Add Seat Button -->
+            <button id="add-seat-button" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2 font-semibold rounded-lg shadow-md transition duration-150 ease-in-out">
+                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add Seat
+            </button>
+        </div>
+    </div>
+    
+    <!-- Status Bar -->
+    <div id="status-bar" class="mb-4 p-3 text-sm rounded-lg bg-blue-100 text-blue-800 transition-opacity duration-300">
+        <span id="status-message">Load complete. Drag seats to move, Ctrl/Cmd + Click to select multiple.</span>
     </div>
 
-    <div id="status" class="mt-4 text-sm text-gray-700"></div>
-  </div>
+    <!-- MAP CONTAINER: Updated to define explicit boundaries -->
+    <div id="map"
+         class="relative overflow-hidden w-full bg-white border-4 border-dashed border-blue-500 rounded-xl shadow-inner cursor-pointer"
+         data-map-width="1000"
+         data-map-height="700"
+         style="width: 100%; max-width: 1000px; height: 700px;"
+         >
+        
+        <!-- Existing seat elements (if any) go here -->
+        {% for seat in seats %}
+            <div 
+                class="seat-admin absolute w-10 h-10 flex items-center justify-center bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-800 transition duration-100 select-none cursor-move"
+                style="left: {{ seat.x_position }}px; top: {{ seat.y_position }}px;"
+                data-seat-id="{{ seat.id }}"
+                data-edit-url="{% url 'edit_seat' seat.id %}"
+                data-initial-x="{{ seat.x_position }}"
+                data-initial-y="{{ seat.y_position }}"
+                data-drag-offset-x="0"
+                data-drag-offset-y="0"
+                data-is-dragging="false"
+                >
+                {{ seat.label }}
+            </div>
+        {% endfor %}
+        
+    </div>
+    <!-- END MAP CONTAINER -->
+    
+    <!-- Hidden Modal for Editing Seat Details -->
+    <div id="edit-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h2 class="text-xl font-semibold mb-4">Edit Seat</h2>
+            <div id="modal-content">Loading...</div>
+            <button id="close-modal-button" class="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Close</button>
+        </div>
+    </div>
+</div>
 
 <script>
-(function(){
-  const map = document.getElementById('map');
-  const saveBtn = document.getElementById('save-btn');
-  const status = document.getElementById('status');
+// --- CORE CONFIGURATION & SETUP ---
 
-  let dragging = null;
-  let offset = {x:0,y:0};
+// Assuming the base size of a seat element is 40x40px (w-10 h-10 from Tailwind)
+const SEAT_SIZE = 40;
 
-  // Setup pointer events for each seat element
-  map.querySelectorAll('.seat-admin').forEach(el => {
-    el.addEventListener('pointerdown', (ev) => {
-      dragging = el;
-      el.setPointerCapture(ev.pointerId);
-      const rect = el.getBoundingClientRect();
-      const parentRect = map.getBoundingClientRect();
-      offset.x = ev.clientX - rect.left;
-      offset.y = ev.clientY - rect.top;
-      el.style.cursor = 'grabbing';
-    });
+(function() {
+    // Check for global Firebase variables (assuming this is used within a full app)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
 
-    el.addEventListener('pointermove', (ev) => {
-      if (!dragging) return;
-      if (ev.pressure === 0 && ev.pointerType === 'mouse') {
-        // pointermove may fire with pressure 0 when no button; ignore
-      }
-      const parentRect = map.getBoundingClientRect();
-      let x = ev.clientX - parentRect.left - offset.x;
-      let y = ev.clientY - parentRect.top - offset.y;
-
-      // clamp inside container
-      x = Math.max(0, Math.min(parentRect.width - el.offsetWidth, x));
-      y = Math.max(0, Math.min(parentRect.height - el.offsetHeight, y));
-
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
-    });
-
-    el.addEventListener('pointerup', (ev) => {
-      if (!dragging) return;
-      dragging.releasePointerCapture(ev.pointerId);
-      dragging.style.cursor = 'grab';
-      dragging = null;
-      // show current coordinates briefly
-      const id = el.dataset.id;
-      const x = parseInt(el.style.left);
-      const y = parseInt(el.style.top);
-      status.textContent = `Seat ${el.textContent} (id ${id}) at x:${x}, y:${y} (not saved)`;
-    });
-
-    // prevent default double click selection
-    el.addEventListener('dblclick', (ev) => ev.preventDefault());
-  });
-
-  saveBtn.addEventListener('click', async () => {
-    const payload = [];
-    map.querySelectorAll('.seat-admin').forEach(el => {
-      payload.push({
-        id: el.dataset.id,
-        x: Math.round(parseFloat(el.style.left) || 0),
-        y: Math.round(parseFloat(el.style.top) || 0)
-      });
-    });
-
-    status.textContent = 'Saving...';
-    try {
-      const res = await fetch("{% url 'seats:save_positions' %}", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCookie('csrftoken'),
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        status.textContent = `Saved ${data.updated} seats.`;
-      } else {
-        status.textContent = 'Save failed.';
-      }
-    } catch (err) {
-      status.textContent = 'Error saving positions: ' + err;
+    if (firebaseConfig) {
+        // Initialize Firebase here if needed for real data persistence
+        // For now, focusing purely on the drag logic
     }
-  });
+    
+    const map = document.getElementById('map');
+    const saveButton = document.getElementById('save-button');
+    const statusBar = document.getElementById('status-bar');
+    const statusMessage = document.getElementById('status-message');
+    const editModal = document.getElementById('edit-modal');
+    
+    // Read map boundaries from data attributes
+    const MAP_BOUND_WIDTH = parseFloat(map.dataset.mapWidth);
+    const MAP_BOUND_HEIGHT = parseFloat(map.dataset.mapHeight);
 
-  // helper to get csrf cookie
-  function getCookie(name) {
-    const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-    return v ? v.pop() : '';
-  }
+    let selectedSeats = [];
+    let dragging = null; // null or { startX: 0, startY: 0, lastX: 0, lastY: 0 }
+    let hasChanges = false;
+    
+    // --- UTILITY FUNCTIONS ---
+    
+    // Update status bar message and color
+    function updateStatus(message, type = 'default') {
+        const classes = {
+            'default': 'bg-blue-100 text-blue-800',
+            'info': 'bg-yellow-100 text-yellow-800',
+            'success': 'bg-green-100 text-green-800',
+            'error': 'bg-red-100 text-red-800',
+        };
+        
+        statusBar.className = `mb-4 p-3 text-sm rounded-lg transition-opacity duration-300 ${classes[type]}`;
+        statusMessage.textContent = message;
+    }
+    
+    // Toggle the save button state
+    function setHasChanges(changed) {
+        hasChanges = changed;
+        if (hasChanges) {
+            saveButton.disabled = false;
+            saveButton.className = 'bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 font-semibold rounded-lg shadow-md transition duration-150 ease-in-out';
+            const count = Array.from(map.querySelectorAll('.seat-admin')).filter(s => {
+                const currentX = Math.round(parseFloat(s.style.left));
+                const currentY = Math.round(parseFloat(s.style.top));
+                return currentX.toString() !== s.dataset.initialX || currentY.toString() !== s.dataset.initialY;
+            }).length;
+            saveButton.textContent = `Save Changes (${count})`;
+            updateStatus('Unsaved changes detected. Click "Save Changes" to commit.', 'info');
+        } else {
+            saveButton.disabled = true;
+            saveButton.className = 'px-5 py-2 text-white font-semibold rounded-lg shadow-md transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed';
+            saveButton.textContent = 'Save Changes (0)';
+            updateStatus(`${selectedSeats.length} seat(s) selected. Ctrl/Cmd + Click to toggle, Drag to move.`, 'default');
+        }
+    }
+
+    // Opens a mock modal (actual implementation is not provided, this is a placeholder)
+    function openModal(url) {
+        console.log("Opening edit modal for URL:", url);
+        editModal.querySelector('#modal-content').innerHTML = `<p>Simulating modal for: <b>${url}</b></p><p>Use this to edit seat details.</p>`;
+        editModal.classList.remove('hidden');
+    }
+
+    document.getElementById('close-modal-button').addEventListener('click', () => {
+        editModal.classList.add('hidden');
+    });
+
+    // --- EVENT HANDLERS ---
+    
+    // Handle Mouse Down (Start Drag or Select)
+    map.addEventListener('mousedown', e => {
+        // Only trigger on left click (button 0)
+        if (e.button !== 0) return;
+
+        const el = e.target.closest('.seat-admin');
+        
+        if (el) {
+            // Check if the seat is already selected
+            const isSelected = el.classList.contains('selected');
+            const isMultiSelect = e.ctrlKey || e.metaKey; // Ctrl or Cmd key
+
+            if (!isSelected) {
+                // If not selected, and not multi-selecting, clear all and select this one
+                if (!isMultiSelect) {
+                    map.querySelectorAll('.seat-admin.selected').forEach(s => s.classList.remove('selected'));
+                }
+                el.classList.add('selected');
+                selectedSeats = Array.from(map.querySelectorAll('.seat-admin.selected'));
+            } else if (isMultiSelect) {
+                // If already selected and multi-selecting, deselect it
+                el.classList.remove('selected');
+                selectedSeats = Array.from(map.querySelectorAll('.seat-admin.selected'));
+                if (selectedSeats.length === 0) {
+                    return; // Stop drag if no seats are selected
+                }
+            }
+            
+            // Re-fetch selected list
+            selectedSeats = Array.from(map.querySelectorAll('.seat-admin.selected'));
+
+            // Start drag only if seats are selected
+            if (selectedSeats.length > 0) {
+                // Initialize dragging state
+                dragging = {
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    lastX: e.clientX,
+                    lastY: e.clientY,
+                    // Store initial click to differentiate between click and drag
+                    isClick: true 
+                };
+                
+                // Store the relative drag offset for each selected seat
+                selectedSeats.forEach(s => {
+                    const rect = s.getBoundingClientRect();
+                    const mapRect = map.getBoundingClientRect();
+                    
+                    // Total displacement from the last saved (initial) position
+                    const currentX = parseFloat(s.style.left);
+                    const currentY = parseFloat(s.style.top);
+
+                    // Offset = Current position - Initial Position (this is the accumulated drag before this mousedown)
+                    s.dataset.dragOffsetX = currentX - parseFloat(s.dataset.initialX);
+                    s.dataset.dragOffsetY = currentY - parseFloat(s.dataset.initialY);
+                });
+            }
+
+        } else {
+            // Clicked on map background: clear selection
+            map.querySelectorAll('.seat-admin.selected').forEach(s => s.classList.remove('selected'));
+            selectedSeats = [];
+            setHasChanges(hasChanges); // Re-run status update
+        }
+    });
+
+    // Handle Mouse Move (Dragging)
+    map.addEventListener('mousemove', e => {
+        if (!dragging || selectedSeats.length === 0) return;
+
+        // It's officially a drag if the mouse moved more than a few pixels
+        if (Math.abs(e.clientX - dragging.startX) > 5 || Math.abs(e.clientY - dragging.startY) > 5) {
+            dragging.isClick = false;
+        }
+
+        // Calculate total delta movement since last mousemove event
+        const deltaX = e.clientX - dragging.lastX;
+        const deltaY = e.clientY - dragging.lastY;
+
+        // Clamp values using the map's configured dimensions
+        const MAP_MAX_X = MAP_BOUND_WIDTH - SEAT_SIZE;
+        const MAP_MAX_Y = MAP_BOUND_HEIGHT - SEAT_SIZE;
+        
+        let movedCount = 0;
+
+        selectedSeats.forEach(s => {
+            // 1. Calculate accumulated drag offset from the *last saved* position
+            const accumulatedOffsetX = parseFloat(s.dataset.dragOffsetX) || 0;
+            const accumulatedOffsetY = parseFloat(s.dataset.dragOffsetY) || 0;
+            
+            // 2. Calculate the position relative to the initial (saved) coordinates
+            const initialX = parseFloat(s.dataset.initialX) || 0;
+            const initialY = parseFloat(s.dataset.initialY) || 0;
+
+            // 3. New raw position (Initial + Accumulated Offset + Current Delta)
+            const rawNewX = initialX + accumulatedOffsetX + deltaX;
+            const rawNewY = initialY + accumulatedOffsetY + deltaY;
+
+            // 4. *** CLAMPING: Ensure seat stays within boundaries ***
+            const clampedX = Math.max(0, Math.min(rawNewX, MAP_MAX_X));
+            const clampedY = Math.max(0, Math.min(rawNewY, MAP_MAX_Y));
+
+            // 5. Apply the clamped position
+            s.style.left = `${clampedX}px`;
+            s.style.top = `${clampedY}px`;
+            
+            // 6. Update the accumulated offset for the *next* mousemove event
+            // New accumulated offset = Old accumulated offset + current delta (only if move was not clamped)
+            // It's safer and cleaner to calculate the new offset based on the clamped position:
+            s.dataset.dragOffsetX = clampedX - initialX;
+            s.dataset.dragOffsetY = clampedY - initialY;
+
+            // Check if position changed to update the status bar
+            if (clampedX !== parseFloat(s.dataset.initialX) || clampedY !== parseFloat(s.dataset.initialY)) {
+                movedCount++;
+            }
+        });
+
+        // Update status display with movement info
+        if (selectedSeats.length > 0) {
+             updateStatus(`Moving ${selectedSeats.length} seat(s). Current drag: ${Math.round(e.clientX - dragging.startX)}px, ${Math.round(e.clientY - dragging.startY)}px`, 'info');
+        }
+        
+        // Update the last position for the next iteration
+        dragging.lastX = e.clientX;
+        dragging.lastY = e.clientY;
+        
+        // Mark changes if anything has moved
+        if (movedCount > 0) {
+            setHasChanges(true);
+        }
+    });
+
+    // Handle Mouse Up (End Drag or Confirm Click)
+    document.addEventListener('mouseup', e => {
+        if (!dragging) return;
+
+        const el = e.target.closest('.seat-admin');
+
+        // Check if it was a quick click vs a drag
+        if (dragging.isClick && el) {
+            // IT WAS A CLICK:
+            // Double-check selection status, a simple click on an unselected element should have already selected it.
+            if (el.classList.contains('selected') && !(e.ctrlKey || e.metaKey)) {
+                // If selected and not multi-selecting, treat it as a request to edit (double-click behavior approximation)
+                // You might need more specific logic (e.g., using a double-click listener) for a real app.
+                // For simplicity, we open the modal on a single click if no multi-select key is held.
+                openModal(el.dataset.editUrl);
+            }
+        } else {
+            // IT WAS A DRAG:
+            // Check if any seat actually moved from its *last saved* position
+            let positionsChanged = false;
+            
+            selectedSeats.forEach(s => {
+                const currentX = Math.round(parseFloat(s.style.left));
+                const currentY = Math.round(parseFloat(s.style.top));
+                
+                if (currentX.toString() !== s.dataset.initialX || currentY.toString() !== s.dataset.initialY) {
+                    positionsChanged = true;
+                }
+                // Reset temp drag data (it's now stored in s.dataset.dragOffsetX/Y based on the new final position)
+                // We keep dragOffsetX/Y as the *total displacement from initial*, as calculated in mousemove.
+            });
+
+            if (positionsChanged) {
+                setHasChanges(true);
+            } else {
+                setHasChanges(false);
+            }
+        }
+        
+        // Finalize selected list and status after click/drag logic
+        selectedSeats = Array.from(map.querySelectorAll('.seat-admin.selected'));
+        if (!hasChanges) {
+            updateStatus(`${selectedSeats.length} seat(s) selected. Ctrl/Cmd + Click to toggle, Drag to move.`, 'default');
+        }
+
+        // Clear dragging state
+        dragging = null;
+    });
+
+    // Handle Add Seat Button (Mock implementation)
+    document.getElementById('add-seat-button').addEventListener('click', () => {
+        // Mock seat ID for demonstration
+        const mockSeatId = Date.now(); 
+        const newSeat = document.createElement('div');
+        newSeat.className = 'seat-admin absolute w-10 h-10 flex items-center justify-center bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-800 transition duration-100 select-none cursor-move selected';
+        
+        // Place new seat at a default position (e.g., top-left corner, 10px from edges)
+        const defaultX = 10;
+        const defaultY = 10;
+
+        newSeat.style.left = `${defaultX}px`;
+        newSeat.style.top = `${defaultY}px`;
+
+        newSeat.dataset.seatId = mockSeatId;
+        newSeat.dataset.editUrl = `/edit-seat/${mockSeatId}/`; // Mock URL
+        newSeat.dataset.initialX = defaultX;
+        newSeat.dataset.initialY = defaultY;
+        newSeat.dataset.dragOffsetX = "0";
+        newSeat.dataset.dragOffsetY = "0";
+        newSeat.dataset.isDragging = "false";
+        newSeat.textContent = 'New';
+        
+        // Clear previous selections and select the new seat
+        map.querySelectorAll('.seat-admin.selected').forEach(s => s.classList.remove('selected'));
+        selectedSeats = [newSeat];
+
+        map.appendChild(newSeat);
+        setHasChanges(true);
+        updateStatus('New seat added at (10, 10). Drag it into position.', 'success');
+    });
+
+    // Initial status update
+    selectedSeats = Array.from(map.querySelectorAll('.seat-admin.selected'));
+    updateStatus(`${selectedSeats.length} seat(s) loaded. Drag seats to move, Ctrl/Cmd + Click to select multiple.`, 'default');
 
 })();
 </script>
-</body>
-</html>
+{% endblock %}
